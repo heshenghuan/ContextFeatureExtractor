@@ -1,0 +1,13 @@
+# python compiled files
+*.pyc
+
+# log files
+*.log
+*log*
+Summary/*
+
+# dataset files
+data/*
+
+# test files
+*test*
