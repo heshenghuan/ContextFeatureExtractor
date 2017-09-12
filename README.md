@@ -49,6 +49,9 @@ Disabled suffixes can be used to extract raw word from a window.
 
 ## History
 
+- **2017-09-12 ver 0.1.2**
+  - label2idx's index starts from 1
+  - Index of unknow words or labels will be 0
 - **2017-09-04 ver 0.1.1**
   - Index of feature ‘OOV’ set to default 0
   - label2idx's index starts from 0
