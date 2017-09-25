@@ -49,6 +49,9 @@ Disabled suffixes can be used to extract raw word from a window.
 
 ## History
 
+- **2017-09-25 ver 0.1.3**
+  - Add new method to return the size of feature templates
+  - Replace both 'START'&'END' tag with '</s>'
 - **2017-09-12 ver 0.1.2**
   - label2idx's index starts from 1
   - Index of unknow words or labels will be 0
