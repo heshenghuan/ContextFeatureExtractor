@@ -12,7 +12,7 @@ import numpy as np
 import tensorflow as tf
 from collections import defaultdict
 from parameters import OOV, MAX_LEN
-from features import Template
+from features import Template, HybridTemplate
 from features import feature_extractor
 
 # keras API
@@ -38,9 +38,9 @@ def create_dicts(train, valid, test, threshold):
     def get_label(stream, pos):
         return [[item[pos] for item in sentc] for sentc in stream]
 
-    words = (get_label(train, 'w')  # 训练集字符集合
-             + ([] if valid is None else get_label(valid, 'w'))  # 验证集字符集合
-             + ([] if test is None else get_label(test, 'w')))  # 测试集字符集合
+    words = (get_label(train, 'x')  # 训练集字符集合
+             + ([] if valid is None else get_label(valid, 'x'))  # 验证集字符集合
+             + ([] if test is None else get_label(test, 'x')))  # 测试集字符集合
     labels = (get_label(train, 'y')
               + ([] if valid is None else get_label(valid, 'y'))
               + ([] if test is None else get_label(test, 'y')))
@@ -69,9 +69,10 @@ def create_dicts(train, valid, test, threshold):
     # print 'construct dict!!'
     for sentc in words:
         for t in sentc:
-            if t not in word_to_id:
-                word_to_id[t] = cur_idx
-                cur_idx += 1
+            for win_t in t:
+                if win_t not in word_to_id:
+                    word_to_id[win_t] = cur_idx
+                    cur_idx += 1
 
     label_to_id = {}
     cur_idx = 1
@@ -87,7 +88,7 @@ def apply_feature_templates(sntc, template=None):
     """
     Apply feature templates, generate feats for each sentence.
     """
-    if template is None or type(template) != Template:
+    if not template:
         raise TypeError('Except a valid Template object but got a \'None\'.')
     if template.valid:
         features = feature_extractor(sntc, templates=template)
@@ -95,7 +96,7 @@ def apply_feature_templates(sntc, template=None):
 
 
 def conv_sentc(X, Y, word2idx, label2idx):
-    sentc = [word2idx.get(w, 0) for w in X]
+    sentc = [[word2idx.get(w_t, 0) for w_t in w] for w in X]
     label = [label2idx.get(l, 0) for l in Y]
     return sentc, label
 
@@ -121,7 +122,7 @@ def conv_corpus(sentcs, featvs, labels, word2idx, feat2idx, label2idx, max_len=M
     The shape of returned 2D tensor is (len(sentcs), MAX_LEN), while the 3D
     tensor's is (len(sentcs), MAX_LEN, len(label2idx) + 1).
 
-    # Parameters
+    ## Parameters
         sentcs: the list of corpus' sentences.
         featvs: the list of feats for sentences.
         labels: the list of sentcs's label sequences.
@@ -129,10 +130,13 @@ def conv_corpus(sentcs, featvs, labels, word2idx, feat2idx, label2idx, max_len=M
         word2idx: the vocabulary of labels, a map.
         max_len: the maximum length of input sentence.
 
-    # Returns
-        new_sentcs: 2D tensor of input corpus
-        new_featvs: 3D tensor of input corpus' features
-        new_labels: 2D tensor of input corpus' label sequences
+    ## Returns
+    new_sentcs: 3D tensor of input corpus with shape
+                (corpus_len, seq_len, window)
+    new_featvs: 3D tensor of input features with shape
+                (corpus_len, seq_len, templates)
+    new_labels: 2D tensor of input labels with shape
+                (corpus_len, seq_len)
     """
     assert len(sentcs) == len(
         labels), "The length of input sentences and labels not equal."
@@ -156,18 +160,21 @@ def read_corpus(fn, template=None):
     """
     Reads corpus file, then returns the list of sentences and labelSeq.
 
-    # Parameters
-        template: feature templates instance
+    ## Parameters
+    template: feature templates instance
 
-    # Returns
-        corpus: the list of corpus' sentences, each sentence is a list of
-                tuple '(char, lexical, label)'
-        length: the length of each sentence in corpus
-        max_len: the maximum length of sentences
+    ## Returns
+    corpus:  the dataset consist of multiple sent-item
+    length:  the length of each sentence in corpus
+    max_len: the maximum length of sentences
+
+    A sent-item is a dict, which consist of multiple key-value pairs. Note
+    that fields 'w', 'y', 'F' and 'x' are reserved for representing token,
+    label, features and  the window-representation of token respectively.
     """
     if fn is None:
         raise ValueError("Expected a valid file path.")
-    assert type(template) == Template
+    assert type(template) == Template or type(template) == HybridTemplate
     fields = template.fields
     with cs.open(fn, encoding='utf-8') as src:
         stream = src.read().strip().split('\n\n')
@@ -180,7 +187,7 @@ def read_corpus(fn, template=None):
             for tk in tokens:
                 column = tk.split()
                 assert len(column) == len(fields)
-                item = {'F': []}  # F field reserved for feats
+                item = {}  # F field reserved for feats
                 for i in range(len(fields)):
                     item[fields[i]] = column[i]
                 sentc.append(item)
@@ -193,20 +200,20 @@ def read_corpus(fn, template=None):
 
 def unfold_corpus(corpus):
     """
-    Unfolds a corpus, converts it's sentences from a list of
-    '(char, lexical, label)' into 3 independent lists, the lexical words list
-    teh labels list and the features list.
+    Unfolds a corpus, converts it's sentences from a list of sent-item into 3
+    independent lists, the window-repr words list the labels list and the
+    features list.
 
     # Return
-        sentcs: a list of sentences, each sentence is a list of lexcial words
-        featvs: a list of features list,shape(sent, word, feats)
+        sentcs: a list of sentences, each sent is a list of window-repr words
+        featvs: a list of features list for each sent's each word
         labels: a list of labels' sequences
     """
     sentcs = []
     labels = []
     featvs = []
     for sent in corpus:
-        sentcs.append([item['w'] for item in sent])
+        sentcs.append([item['x'] for item in sent])
         labels.append([item['y'] for item in sent])
         featvs.append([item['F'] for item in sent])
 
