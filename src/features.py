@@ -16,12 +16,14 @@ class Template(object):
     """
     Context-based feature template.
     """
+
     def __init__(self, fn=None, sep=', ', suffix=True):
         """
-        Returns a templates instance from file.
+        Returns a Template instance from file.
 
-        fn: templates file path
-        sep: separator
+        ## Params
+        fn:     templates file path
+        sep:    separator
         suffix: Enable or disable feature suffix which used to identify
                 different templates
         """
@@ -50,7 +52,8 @@ class Template(object):
                     field, offset = t.strip().split(':')
                     if field not in self._fields:
                         p = os.path.abspath(fn)
-                        e = "Unknow field %s, File \"%s\", line %d" % (field, p, i+1)
+                        e = "Unknow field %s, File \"%s\", line %d" % (
+                            field, p, i + 1)
                         raise ValueError(e)
                     temp.append((field, int(offset)))
                 self._template.append(temp)
@@ -92,6 +95,55 @@ class Template(object):
         return len(self._template)
 
 
+class HybridTemplate(Template):
+    """
+    Hybrid template for both context-based feature and window-based feature.
+
+    For example, in many task we often used a window([-t, +t]) to extract
+    tokens arround current position p, and use those tokens(from p-t to p+t)
+    to represent the token at p. Then we will concatenate the embeddings of
+    those tokens as input of model.
+
+    But some architecture may need additional feature, like POS tag, then
+    you might need HybridTemplate.
+    """
+
+    def __init__(self, fn=None, window=(0, 0), sep=', ', suffix=True):
+        """
+        Returns a HybridTemplate instance from given setting.
+
+        ## Params
+        fn:     templates file path
+        window: a tuple that specified window's boundary
+        sep:    separator
+        suffix: Enable or disable feature suffix which used to identify
+                different templates
+        """
+        super(HybridTemplate, self).__init__(fn, sep, suffix)
+        # the left & right boundary
+        if window[1] < window[0]:
+            raise ValueError('Right boundary less than left boundary.')
+        self.boundary = window
+        self._window = []
+        for i in range(window[0], window[1]+1):
+            self._window.append([('w', i)])
+
+    def __str__(self):
+        string = str(self.__class__) + '\n'
+        string += "Fields(%s)\n" % (', '.join("'%s'" % f for f in self.fields))
+        string += "Window's size:" + str(self.boundary) + "\n"
+        string += '' if self._suffix else "Suffix disabled\n" + 'Templates:\n'
+        string += ",\n".join(str(t) for t in self._template)
+        return string
+
+    @property
+    def window(self):
+        return self._window
+
+    @window.setter
+    def window(self, *args, **kwargs):
+        pass
+
 # Field names of the input data.
 # fields = ['w', 'y']
 
@@ -130,7 +182,8 @@ def readiter(data, names):
     X = []
     for line in data:
         if len(line) != len(names):
-            raise ValueError('Too many/few fields (%d) for %r\n' % (len(line), names))
+            raise ValueError('Too many/few fields (%d) for %r\n' %
+                             (len(line), names))
         item = {'F': []}    # 'F' is reserved for features.
         for i in range(len(names)):
             item[names[i]] = line[i]
@@ -155,6 +208,7 @@ def apply_templates(X, templates=None, suffix=True):
     if templates is None:
         raise TypeError("templates should be iterable type not NoneType")
     length = len(X)
+    features = [[] for _ in range(len(X))]
     for template in templates:
         name = '|'.join(['%s[%d]' % (f, o) for f, o in template])
         for t in range(len(X)):
@@ -168,10 +222,10 @@ def apply_templates(X, templates=None, suffix=True):
                 else:
                     values.append(X[p][field])
             if suffix:
-                X[t]['F'].append('%s=%s' % (name, '|'.join(values)))
+                features[t].append('%s=%s' % (name, '|'.join(values)))
             else:
-                X[t]['F'].append('%s' % ('|'.join(values)))
-    return X
+                features[t].append('%s' % ('|'.join(values)))
+    return features
 
 
 def escape(src):
@@ -213,6 +267,17 @@ def output_features(fo, X, field=''):
 
 def feature_extractor(X, templates=None):
     # Apply attribute templates to obtain features (in fact, attributes)
-    if templates is None:
-        raise TypeError("templates should be iterable type not NoneType")
-    return apply_templates(X, templates.template, templates.suffix)
+    if type(templates) == Template:
+        features = apply_templates(X, templates.template, templates.suffix)
+        for t in range(len(X)):
+            X[t]['F'] = features[t]
+            X[t]['x'] = [X[t]['w']]
+    elif type(templates) == HybridTemplate:
+        features = apply_templates(X, templates.template, templates.suffix)
+        for t in range(len(X)):
+            X[t]['F'] = features[t]
+        # window tokens
+        features = apply_templates(X, templates.window, False)
+        for t in range(len(X)):
+            X[t]['x'] = features[t]
+    return X
