@@ -1,12 +1,12 @@
 # Neural Text Process lib
 
-## Introduction
+## 1 Introduction
 
 A neural text process python lib for sequence tagging data generating.
 
 Support feature template which used to extract context-based feature from text. Support hybrid feature template which often been used in Neural Network sequence labeling.
 
-## Fields
+## 2 Fields
 
 This lib used 'fields' to specify input data's format. In template file, you could see it's definition at the first and second line.
 
@@ -14,7 +14,7 @@ In particular, there are several reserved fields named 'w', 'y', 'x' and 'F', wh
 
 For example, there are some datas:
 
-```
+```text
 我 C S
 爱 C S
 北 C B
@@ -29,7 +29,7 @@ Each line is consist of multiple columns, but the first column is token itself(f
 
 So you can define a template for this data like:
 
-```
+``` text
 # Fields
 w T y
 # Templates
@@ -39,17 +39,17 @@ w: 1
 T: 0
 ```
 
-Which used field name 'T'. You can use any string but not {'w', 'y', 'x' and 'F'} to assign a field name.
+Which used field name 'T' to specify the second column. You can use any string but not {'w', 'y', 'x' and 'F'} to assign a field name.
 
-## Basic Feature Template
+## 3 Basic Feature Template
 
 A basic feature template(src.feature.Template) is used to extract context-based feature for text.
 
-### Suffix
+### 3.1 Prefix
 
-Support feature templates suffixes enabled or disabled. For example, there are few context-based feature templates:
+Support feature templates prefixes enabled or disabled. For example, there are few context-based feature templates:
 
-```
+```text
 # Fields
 w y
 # Templates
@@ -62,35 +62,35 @@ w: 2
 
 Given the sentence "我爱北京天安门。", then it will extract features for "北" and "京" as:
 
-1. Suffix enbaled
+1. Prefix enbaled
 
 ```python
 '北': ['w[-2]:我', 'w[-1]:爱', 'w[0]:北', 'w[1]:京', 'w[2]:天']
 '京': ['w[-2]:爱', 'w[01]:北', 'w[0]:京', 'w[1]:天', 'w[2]:安']
 ```
 
-2. Suffix disabled
+2. Prefix disabled
 
 ```python
 '北': ['我', '爱', '北', '京', '天']
 '京': ['爱', '北', '京', '天', '安']
 ```
 
-Disabled suffixes can be used to extract raw word from a window.
+The prefix `'w[n]:'` disappeared. Disabled prefixes can be used to extract raw word from a window.
 
-### Usage
+### 3.2 Usage
 
-It is easy to use class Template, just type `temp = Template(template_file, suffix)`, and then use `temp` as a parameter.
+It is easy to use class Template, just type `temp = Template(template_file, prefix)`, and then use `temp` as a parameter.
 
-## HybridTemplate
+## 4 HybridTemplate
 
-A HybridTemplate(src.features.HybridTemplate) is a combination of suffix-enabled Template and suffix-disabled Template. It will generate both window-repr and context-feature.
+A HybridTemplate(src.features.HybridTemplate) is a combination of prefix-enabled Template and prefix-disabled Template. It will generate both window-repr and context-feature.
 
-### Explanation
+### 4.1 Explanation
 
 For example, if the window size equals to 3 which means each token is represente by it's left and right neighboring tokens. And the template is:
 
-```
+```text
 # Fields
 w y
 # Templates
@@ -108,19 +108,21 @@ Given the sentence "我爱北京天安门。", then it will use these to represe
 '京': ['北', '京', '天']
 ```
 
-And it will extract features for "北" and "京" as(default suffix enabled):
+And it will extract features for "北" and "京" as(default prefix enabled):
 
 ```python
 '北': ['w[-2]:我', 'w[-1]:爱', 'w[0]:北', 'w[1]:京', 'w[2]:天']
 '京': ['w[-2]:爱', 'w[01]:北', 'w[0]:京', 'w[1]:天', 'w[2]:安']
 ```
 
-### Usage
+### 4.2 Usage
 
 It is easy to use class HybridTemplate, just type `temp = HybridTemplate(template_file, window)`, and then use `temp` as a parameter.
 
 ## History
 
+- **2018-01-09 ver 0.2.1**
+  - Prefix, not suffix(Ah my poor English:sweat_smile:).
 - **2017-10-30 ver 0.2.0**
   - New HybridTemplate support
     - Window-representation for current token, i.e. Xt = [Wt-l,...,Wt+r], you can represent Wt by concatenating vector.
