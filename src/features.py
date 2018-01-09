@@ -17,27 +17,27 @@ class Template(object):
     Context-based feature template.
     """
 
-    def __init__(self, fn=None, sep=', ', suffix=True):
+    def __init__(self, fn=None, sep=', ', prefix=True):
         """
         Returns a Template instance from file.
 
         ## Params
         fn:     templates file path
         sep:    separator
-        suffix: Enable or disable feature suffix which used to identify
+        prefix: Enable or disable feature prefix which used to identify
                 different templates
         """
         self._fields = None
         self._template = None
-        self._suffix = None
+        self._prefix = None
         self._valid = False
 
         if fn is None:
             raise ValueError('Initializer got a \'None\' instead a file path.')
         else:
-            self.build(fn, sep, suffix)
+            self.build(fn, sep, prefix)
 
-    def build(self, fn, sep, suffix):
+    def build(self, fn, sep, prefix):
         self._fields = []
         self._template = []
         with cs.open(fn, 'r', 'utf8') as src:
@@ -57,13 +57,13 @@ class Template(object):
                         raise ValueError(e)
                     temp.append((field, int(offset)))
                 self._template.append(temp)
-            self._suffix = suffix
+            self._prefix = prefix
             self._valid = True
 
     def __str__(self):
         string = str(self.__class__) + '\n'
         string += "Fields(%s)\n" % (', '.join("'%s'" % f for f in self.fields))
-        string += '' if self._suffix else "Suffix disabled\n" + 'Templates:\n'
+        string += '' if self._prefix else "Prefix disabled\n" + 'Templates:\n'
         string += ",\n".join(str(t) for t in self._template)
         return string
 
@@ -88,8 +88,8 @@ class Template(object):
         return self._valid
 
     @property
-    def suffix(self):
-        return self._suffix
+    def prefix(self):
+        return self._prefix
 
     def size(self):
         return len(self._template)
@@ -108,7 +108,7 @@ class HybridTemplate(Template):
     you might need HybridTemplate.
     """
 
-    def __init__(self, fn=None, window=(0, 0), sep=', ', suffix=True):
+    def __init__(self, fn=None, window=(0, 0), sep=', ', prefix=True):
         """
         Returns a HybridTemplate instance from given setting.
 
@@ -116,10 +116,10 @@ class HybridTemplate(Template):
         fn:     templates file path
         window: a tuple that specified window's boundary
         sep:    separator
-        suffix: Enable or disable feature suffix which used to identify
+        prefix: Enable or disable feature prefix which used to identify
                 different templates
         """
-        super(HybridTemplate, self).__init__(fn, sep, suffix)
+        super(HybridTemplate, self).__init__(fn, sep, prefix)
         # the left & right boundary
         if window[1] < window[0]:
             raise ValueError('Right boundary less than left boundary.')
@@ -132,7 +132,7 @@ class HybridTemplate(Template):
         string = str(self.__class__) + '\n'
         string += "Fields(%s)\n" % (', '.join("'%s'" % f for f in self.fields))
         string += "Window's size:" + str(self.boundary) + "\n"
-        string += '' if self._suffix else "Suffix disabled\n" + 'Templates:\n'
+        string += '' if self._prefix else "Prefix disabled\n" + 'Templates:\n'
         string += ",\n".join(str(t) for t in self._template)
         return string
 
@@ -191,7 +191,7 @@ def readiter(data, names):
     return X
 
 
-def apply_templates(X, templates=None, suffix=True):
+def apply_templates(X, templates=None, prefix=True):
     """
     Generate features for an item sequence by applying feature templates.
     A feature template consists of a tuple of (name, offset) pairs,
@@ -221,7 +221,7 @@ def apply_templates(X, templates=None, suffix=True):
                     values.append(END)
                 else:
                     values.append(X[p][field])
-            if suffix:
+            if prefix:
                 features[t].append('%s=%s' % (name, '|'.join(values)))
             else:
                 features[t].append('%s' % ('|'.join(values)))
@@ -268,12 +268,12 @@ def output_features(fo, X, field=''):
 def feature_extractor(X, templates=None):
     # Apply attribute templates to obtain features (in fact, attributes)
     if type(templates) == Template:
-        features = apply_templates(X, templates.template, templates.suffix)
+        features = apply_templates(X, templates.template, templates.prefix)
         for t in range(len(X)):
             X[t]['F'] = features[t]
             X[t]['x'] = [X[t]['w']]
     elif type(templates) == HybridTemplate:
-        features = apply_templates(X, templates.template, templates.suffix)
+        features = apply_templates(X, templates.template, templates.prefix)
         for t in range(len(X)):
             X[t]['F'] = features[t]
         # window tokens
