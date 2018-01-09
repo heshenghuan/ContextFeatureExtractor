@@ -9,7 +9,7 @@ http://github.com/heshenghuan
 
 from src import features, parameters, pretreatment, utils
 
-__version__ = 'NeuralTextProcess lib 0.2.0'
+__version__ = 'NeuralTextProcess lib 0.2.1'
 
 __all__ = [
     "features", "parameters",
