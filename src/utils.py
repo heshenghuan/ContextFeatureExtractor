@@ -12,6 +12,7 @@ import os
 import numpy as np
 import codecs as cs
 from parameters import FloatX
+from collections import defaultdict
 
 __all__ = [
     "read_emb_from_file", "conv_data"
@@ -231,29 +232,39 @@ def _conv_y(y):
 
 def eval_ner(pred, gold):
     """
-    Utilities for evaluation.
-    2017-02-15 19:29:49 还未阅读这部分
+    Evaluation method for BIO-tagged sequences. The label must conform to the
+    format of `O`, B-name` or `I-name`. Use ‘-’ to separate location label and
+    entity type label.
+
+    Return the overall P(precision) R(recall) and F(f1-measure)
     """
-    print 'Evaluating...'
-    eval_dict = {}    # value=[#match, #pred, #gold]
+    #  evaluation cache
+    #  eval_dict[entity_type]=[#match, #pred, #gold]
+    eval_dict = defaultdict(lambda: [0] * 3)
+
+    def cal(tag_detail, accu_index):
+        """
+        Entity number accumulation.
+        """
+        if len(tag_detail) == 2:
+            entity_type = tag_detail[1]
+            if tag_detail[0] == 'B' or tag_detail[0] == 'S':
+                eval_dict[entity_type][accu_index] += 1
+
     for p_1sent, g_1sent in zip(pred, gold):
+        # whether in process of matching chunk
         in_correct_chunk = False
+        # last paired entity type [pred_type, gold_type]
         last_pair = ['^', '$']
+
         for p, g in zip(p_1sent, g_1sent):
             tp = p.split('-')
             tg = g.split('-')
-            if len(tp) == 2:
-                if tp[1] not in eval_dict:
-                    eval_dict[tp[1]] = [0] * 3
-                if tp[0] == 'B' or tp[0] == 'S':
-                    eval_dict[tp[1]][1] += 1
-            if len(tg) == 2:
-                if tg[1] not in eval_dict:
-                    eval_dict[tg[1]] = [0] * 3
-                if tg[0] == 'B' or tg[0] == 'S':
-                    eval_dict[tg[1]][2] += 1
+            cal(tp, 1)
+            cal(tp, 2)
 
             if p != g or len(tp) == 1:
+                #  mismatch or prediction is O
                 if in_correct_chunk and tp[0] != 'I' and tg[0] != 'I' and tp[0] != 'E' and tg[0] != 'E':
                     assert last_pair[0] == last_pair[1]
                     eval_dict[last_pair[0]][0] += 1
