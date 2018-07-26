@@ -119,6 +119,34 @@ And it will extract features for "北" and "京" as(default prefix enabled):
 
 It is easy to use class HybridTemplate, just type `temp = HybridTemplate(template_file, window)`, and then use `temp` as a parameter.
 
+## 5 Evaluation for BIO/BIEO/BIES tagged sequences
+
+Evaluation method for BIO/BIEO/BIES tagged sequences has been offered in this project. The label must conform to the following format:
+
+```
+O
+B-name or I-name
+```
+
+For example, in NER tasks usually, has multiple kinds entity waited to be recognized. They usually are 'PER', 'LOC' and 'ORG'. 
+
+So in this case, the label set could be:
+
+```
+# others
+O
+# Begin token of a certain type entity
+B-PER
+B-ORG
+B-LOC
+# Inside token of a certain type entity
+I-PER
+I-LOC
+I-ORG
+```
+
+But if the label set is not subdivided like this, **just attach a suffix like `'.ANYTHING'` after any non-O label** to prevent the program from going wrong.
+
 ## History
 
 - **2018-01-09 ver 0.2.1**
