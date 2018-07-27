@@ -119,7 +119,7 @@ And it will extract features for "北" and "京" as(default prefix enabled):
 
 It is easy to use class HybridTemplate, just type `temp = HybridTemplate(template_file, window)`, and then use `temp` as a parameter.
 
-## 5 Evaluation for BIO/BISOtagged sequences
+## 5 Evaluation for BIO/BISO tagged sequences
 
 Evaluation method for *BIO/BISO* tagged sequences has been offered in this project. The label must conform to the following format:
 
@@ -149,7 +149,7 @@ I-LOC
 I-ORG
 ```
 
-But if the label set is not subdivided like this, **just attach a suffix like `'.ANYTHING'` after any non-O label** to prevent the program from going wrong.
+But if the label set is not subdivided like this, **just attach a suffix like `'-ANYTHING'` after any non-O label** to prevent the program from going wrong.
 
 ## History
 
