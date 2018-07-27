@@ -232,14 +232,14 @@ def _conv_y(y):
 
 def eval_ner(pred, gold):
     """
-    Evaluation method for BIO-tagged sequences. The label must conform to the
-    format of `O`, B-name` or `I-name`. Use ‘-’ to separate location label and
-    entity type label.
+    Evaluation method for BIO/BISO tagged sequences. The label must conform to
+    the format of `O`, B-name` or `I-name`. Use ‘-’ to separate location label
+    and entity type label.
 
     Return the overall P(precision) R(recall) and F(f1-measure)
     """
     #  evaluation cache
-    #  eval_dict[entity_type]=[#match, #pred, #gold]
+    #  eval_dict[entity_type]=[#matched, #pred, #gold]
     eval_dict = defaultdict(lambda: [0] * 3)
 
     def cal(tag_detail, accu_index):
@@ -249,13 +249,21 @@ def eval_ner(pred, gold):
         if len(tag_detail) == 2:
             entity_type = tag_detail[1]
             if tag_detail[0] == 'B' or tag_detail[0] == 'S':
+                # Begin of an entity
                 eval_dict[entity_type][accu_index] += 1
 
     for p_1sent, g_1sent in zip(pred, gold):
         # whether in process of matching chunk
-        in_correct_chunk = False
+        matching_chunk = False
         # last paired entity type [pred_type, gold_type]
         last_pair = ['^', '$']
+
+        def check_paired():
+            if last_pair[0] == last_pair[1]:
+                # the chunk matched
+                eval_dict[last_pair[0]][0] += 1
+            else:
+                print "Type mismatched inside a chunk"
 
         for p, g in zip(p_1sent, g_1sent):
             tp = p.split('-')
@@ -263,45 +271,56 @@ def eval_ner(pred, gold):
             cal(tp, 1)
             cal(tp, 2)
 
-            if p != g or len(tp) == 1:
-                #  mismatch or prediction is O
-                if in_correct_chunk and tp[0] != 'I' and tg[0] != 'I' and tp[0] != 'E' and tg[0] != 'E':
-                    assert last_pair[0] == last_pair[1]
-                    eval_dict[last_pair[0]][0] += 1
-                in_correct_chunk = False
+            if p != g or len(tp) == 1:  # mismatch or prediction is O
+                if matching_chunk and tp[0] != 'I' and tg[0] != 'I':
+                    # tp&tg equals O or S, at entity boundary
+                    check_paired()
+                # reset
+                matching_chunk = False
                 last_pair = ['^', '$']
-            else:
-                if tg[0] == 'B' or tg[0] == 'S':
-                    if in_correct_chunk:
-                        assert (last_pair[0] == last_pair[1])
-                        eval_dict[last_pair[0]][0] += 1
+            else:  # pred == gold && they are not O label
+                if tg[0] == 'B' or tg[0] == 'S':  # start of an entity
+                    if matching_chunk:
+                        check_paired()
                     last_pair = [tp[-1], tg[-1]]
                 if tg[0] == 'B':
-                    in_correct_chunk = True
+                    matching_chunk = True
                 if tg[0] == 'S':
+                    #  check_paired cannot deal with S tag
                     eval_dict[last_pair[0]][0] += 1
-                    in_correct_chunk = False
-        if in_correct_chunk:
-            assert last_pair[0] == last_pair[1]
-            eval_dict[last_pair[0]][0] += 1
-    agg_measure = [0.0] * 3
-    agg_counts = [0] * 3
+                    matching_chunk = False
+        if matching_chunk:
+            check_paired()
+    # Calculation process of P/R/F
+    print "Label: \tmatch\tpred\tgold\tp\tr\tf"
+    macro = [0.0] * 3
+    overall = [0] * 3
     for k, v in eval_dict.items():
-        agg_counts = [sum(x) for x in zip(agg_counts, v)]
+        overall = [sum(x) for x in zip(overall, v)]
         prec = float(v[0]) / v[1] if v[1] != 0 else 0.0
         recall = float(v[0]) / v[2] if v[2] != 0 else 0.0
         F1 = 2 * prec * recall / \
             (prec + recall) if prec != 0 and recall != 0 else 0.0
-        agg_measure[0] += prec
-        agg_measure[1] += recall
-        agg_measure[2] += F1
-        print k + ':', v[0], '\t', v[1], '\t', v[2], '\t', prec, '\t', recall, '\t', F1
-    agg_measure = [v / len(eval_dict) for v in agg_measure]
-    print 'Macro average:', '\t', agg_measure[0], '\t', agg_measure[1], '\t', agg_measure[2]
-    prec = float(agg_counts[0]) / agg_counts[1] if agg_counts[1] != 0 else 0.0
-    recall = float(agg_counts[0]) / \
-        agg_counts[2] if agg_counts[2] != 0 else 0.0
+        macro[0] += prec
+        macro[1] += recall
+        macro[2] += F1
+        print_values(k, v, prec * 100, recall * 100, F1 * 100)
+    # Macro average
+    macro = [v * 100 / len(eval_dict) for v in macro]
+    print 'Macro Avg:'
+    print 'p=%.2f%%\tr=%.2f%%\tf=%.2f%%' % (macro[0], macro[1], macro[2])
+    # Micro average
+    prec = float(overall[0]) / overall[1] if overall[1] != 0 else 0.0
+    recall = float(overall[0]) / \
+        overall[2] if overall[2] != 0 else 0.0
     F1 = 2 * prec * recall / \
         (prec + recall) if prec != 0 and recall != 0 else 0.0
-    print 'Micro average:', agg_counts[0], '\t', agg_counts[1], '\t', agg_counts[2], '\t', prec, '\t', recall, '\t', F1
+    print 'Micro Avg: match=%d, pred=%d, gold=%d' % \
+        (overall[0], overall[1], overall[2])
+    print 'p=%.2f%%\tr=%.2f%%\tf=%.2f%%' % (prec * 100, recall * 100, F1 * 100)
     return {'p': prec, 'r': recall, 'f1': F1}
+
+
+def print_values(t, v, p, r, f):
+    print "%s: %d\t%d\t%d\t%.2f%%\t%.2f%%\t%.2f%%" % \
+        (t, v[0], v[1], v[2], p, r, f)
